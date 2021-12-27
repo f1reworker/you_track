@@ -1,4 +1,0 @@
-io/flutter/plugins/GeneratedPluginRegistrant.java
- io.flutter.plugins.GeneratedPluginRegistrant
-com/example/bonch_dev/BuildConfig.java
- com.example.bonch_dev.BuildConfig
