@@ -32,6 +32,7 @@ dependencies:
   image_picker_web: ^2.1.0
   flutter_multi_formatter: ^2.5.1
   email_validator: ^2.0.1
+  image_picker: ^0.8.4+4
 
 
   # The following adds the Cupertino Icons font to your application.

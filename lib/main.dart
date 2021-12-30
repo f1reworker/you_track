@@ -1,7 +1,12 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
-import 'package:image_picker_web/image_picker_web.dart';
+import 'package:flutter/services.dart';
+//import 'package:image_picker_web/image_picker_web.dart';
 import 'package:flutter_multi_formatter/flutter_multi_formatter.dart';
 import 'package:email_validator/email_validator.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:image_picker_web/image_picker_web.dart';
 
 void main() {
   runApp(const MyApp());
@@ -172,9 +177,13 @@ class _MyHomePageState extends State<MyHomePage> {
     final isValid = _formKey.currentState!.validate();
     if (isValid) {
       print(_fioController.text +
+          "   " +
           _phoneController.text +
+          "   " +
           _mailController.text +
+          "  " +
           _themeController.text +
+          "   " +
           _textController.text);
       print(_pickedImages);
       setState(() {
