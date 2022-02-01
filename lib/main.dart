@@ -1,5 +1,8 @@
 // ignore_for_file: avoid_web_libraries_in_flutter
+import 'dart:convert';
+import 'dart:math';
 
+import 'package:http/http.dart' as http;
 import 'dart:html';
 import 'package:flutter/material.dart';
 import 'package:image_picker_web/image_picker_web.dart';
@@ -100,8 +103,7 @@ class _MyHomePageState extends State<MyHomePage> {
                   height: 60,
                   width: 480,
                   child: ElevatedButton.icon(
-                    onPressed: () //=> saveForm()
-                        {},
+                    onPressed: () => saveForm(),
                     icon: const Icon(Icons.done),
                     label: const Text('Сохранить'),
                   )),
@@ -149,6 +151,7 @@ class _MyHomePageState extends State<MyHomePage> {
     document.onPaste.listen((ClipboardEvent e) {
       if (e.clipboardData?.items![0].type == 'image/png') {
         File image = e.clipboardData!.items![0].getAsFile()!;
+
         setState(() {
           imageFromClipboard.add(image);
         });
@@ -188,7 +191,10 @@ class _MyHomePageState extends State<MyHomePage> {
 
   saveForm() {
     final isValid = _formKey.currentState!.validate();
+
     if (isValid) {
+      httpPost(_fioController.text, _phoneController.text, _mailController.text,
+          _themeController.text, _textController.text);
       print(_fioController.text +
           "   " +
           _phoneController.text +
@@ -205,5 +211,29 @@ class _MyHomePageState extends State<MyHomePage> {
         _textController.text = "";
       });
     }
+  }
+}
+
+httpPost(
+    String fio, String phone, String email, String theme, String text) async {
+  String url = "http://172.18.1.207/api/issues";
+  var body = json.encode({
+    "project": {"id": "0-72"},
+    "summary": theme,
+    "description": "ФИО: $fio \nТелефон: $phone\nEmail: $email\n$text"
+  });
+  try {
+    var responce = await http.post(Uri.parse(url),
+        headers: {
+          'Accept': "application/json",
+          'Authorization':
+              'Bearer perm:YWRtaW4=.NDctMTM=.DBhGgPTunKliw4DKjQa1R6D7Dkcu93',
+          'Content-Type': 'application/json'
+        },
+        body: body);
+    print("Response status: ${responce.statusCode}");
+    print("Response body: ${responce.body}");
+  } catch (error) {
+    print("error: $error");
   }
 }
