@@ -1,13 +1,15 @@
 // ignore_for_file: avoid_web_libraries_in_flutter
 import 'dart:convert';
-import 'dart:math';
-
 import 'package:http/http.dart' as http;
-import 'dart:html';
+import 'dart:html' as html;
 import 'package:flutter/material.dart';
-import 'package:image_picker_web/image_picker_web.dart';
 import 'package:flutter_multi_formatter/flutter_multi_formatter.dart';
 import 'package:email_validator/email_validator.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:typed_data';
+import 'package:http_parser/http_parser.dart';
+import 'package:path/path.dart';
+import 'package:async/async.dart';
 
 void main() {
   runApp(const MyApp());
@@ -47,7 +49,7 @@ class _MyHomePageState extends State<MyHomePage> {
   final _mailController = TextEditingController();
   final _themeController = TextEditingController();
   final _textController = TextEditingController();
-  final _pickedImages = <Image>[];
+  final List<XFile> _pickedImages = [];
 
   @override
   void dispose() {
@@ -89,13 +91,31 @@ class _MyHomePageState extends State<MyHomePage> {
                   child: const Text('Выбрать изображение'),
                 ),
               ),
-              imageFromClipboard.isNotEmpty
-                  ? Container(
-                      alignment: Alignment.centerLeft,
+              _pickedImages.isNotEmpty
+                  ? SizedBox(
                       height: 200,
-                      child: Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: Image.file(imageFromClipboard[0])))
+                      child: ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          shrinkWrap: true,
+                          itemCount: _pickedImages.length,
+                          itemBuilder: (context, index) => Stack(children: [
+                                Container(
+                                    alignment: Alignment.centerLeft,
+                                    child: Padding(
+                                        padding: const EdgeInsets.all(8.0),
+                                        child: Image.network(
+                                            _pickedImages[index].path))),
+                                IconButton(
+                                    onPressed: () {
+                                      setState(() {
+                                        _pickedImages.removeAt(index);
+                                      });
+                                    },
+                                    icon: const Icon(Icons.close))
+                              ]),
+                          separatorBuilder: (context, index) =>
+                              const Divider(color: Colors.transparent)),
+                    )
                   : const SizedBox(),
               Container(
                   padding: const EdgeInsets.only(left: 10),
@@ -113,11 +133,10 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   Future<void> _pickImage() async {
-    final fromPicker = await ImagePickerWeb.getImageAsWidget();
+    final fromPicker = await ImagePicker().pickMultiImage();
     if (fromPicker != null) {
       setState(() {
-        _pickedImages.clear();
-        _pickedImages.add(fromPicker);
+        _pickedImages.addAll(fromPicker);
       });
     }
   }
@@ -148,9 +167,9 @@ class _MyHomePageState extends State<MyHomePage> {
 
   Widget _buildInputText(String hintText, TextEditingController controller,
       TextInputType type, int minLines) {
-    document.onPaste.listen((ClipboardEvent e) {
+    html.document.onPaste.listen((html.ClipboardEvent e) {
       if (e.clipboardData?.items![0].type == 'image/png') {
-        File image = e.clipboardData!.items![0].getAsFile()!;
+        html.File image = e.clipboardData!.items![0].getAsFile()!;
 
         setState(() {
           imageFromClipboard.add(image);
@@ -189,51 +208,74 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 
-  saveForm() {
+  saveForm() async {
     final isValid = _formKey.currentState!.validate();
-
     if (isValid) {
       httpPost(_fioController.text, _phoneController.text, _mailController.text,
-          _themeController.text, _textController.text);
-      print(_fioController.text +
-          "   " +
-          _phoneController.text +
-          "   " +
-          _mailController.text +
-          "  " +
-          _themeController.text +
-          "   " +
-          _textController.text);
-      print(_pickedImages);
+          _themeController.text, _textController.text, _pickedImages);
+    }
+  }
+
+  uploadImage(String imageFilePath, Uint8List imageBytes, String id) async {
+    String url =
+        "http://172.18.1.207/api/issues/$id/attachments?fields=id,name";
+    PickedFile imageFile = PickedFile(imageFilePath);
+    var stream = http.ByteStream(DelegatingStream.typed(imageFile.openRead()));
+
+    var uri = Uri.parse(url);
+    int length = imageBytes.length;
+    var request = http.MultipartRequest("POST", uri);
+    var multipartFile = http.MultipartFile('files', stream, length,
+        filename: basename(imageFile.path),
+        contentType: MediaType('image', 'png'));
+
+    request.files.add(multipartFile);
+    request.headers.addAll({
+      'Accept': "application/json",
+      'Authorization':
+          'Bearer perm:YWRtaW4=.NDctMTM=.DBhGgPTunKliw4DKjQa1R6D7Dkcu93',
+      'Content-Type': 'multipart/form-data'
+    });
+    var response = await request.send();
+    print(response.statusCode);
+    response.stream.transform(utf8.decoder).listen((value) {
+      print(value);
+    });
+  }
+
+  httpPost(String fio, String phone, String email, String theme, String text,
+      List<XFile> filename) async {
+    String url = "http://172.18.1.207/api/issues";
+    var body = json.encode({
+      "project": {"id": "0-72"},
+      "summary": theme,
+      "description": "ФИО: $fio \nТелефон: $phone\nEmail: $email\n$text"
+    });
+    try {
+      var responce = await http.post(Uri.parse(url),
+          headers: {
+            'Accept': "application/json",
+            'Authorization':
+                'Bearer perm:YWRtaW4=.NDctMTM=.DBhGgPTunKliw4DKjQa1R6D7Dkcu93',
+            'Content-Type': 'application/json'
+          },
+          body: body);
+      if (responce.statusCode == 200) {
+        final body = json.decode(responce.body);
+        String id = body["id"];
+        if (filename.isNotEmpty) {
+          for (int i = 0; i < filename.length; i++) {
+            uploadImage(filename[i].path, await filename[i].readAsBytes(), id);
+          }
+        }
+      }
       setState(() {
         _pickedImages.clear();
         _themeController.text = "";
         _textController.text = "";
       });
+    } catch (error) {
+      print("error: $error");
     }
-  }
-}
-
-httpPost(
-    String fio, String phone, String email, String theme, String text) async {
-  String url = "http://172.18.1.207/api/issues";
-  var body = json.encode({
-    "project": {"id": "0-72"},
-    "summary": theme,
-    "description": "ФИО: $fio \nТелефон: $phone\nEmail: $email\n$text"
-  });
-  try {
-    var responce = await http.post(Uri.parse(url),
-        headers: {
-          'Accept': "application/json",
-          'Authorization':
-              'Bearer perm:YWRtaW4=.NDctMTM=.DBhGgPTunKliw4DKjQa1R6D7Dkcu93',
-          'Content-Type': 'application/json'
-        },
-        body: body);
-    print("Response status: ${responce.statusCode}");
-    print("Response body: ${responce.body}");
-  } catch (error) {
-    print("error: $error");
   }
 }
