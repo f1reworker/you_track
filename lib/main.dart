@@ -1,4 +1,4 @@
-// ignore_for_file: avoid_web_libraries_in_flutter
+// ignore_for_file: avoid_web_libraries_in_flutter, deprecated_member_use
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'dart:html' as html;
@@ -10,6 +10,7 @@ import 'dart:typed_data';
 import 'package:http_parser/http_parser.dart';
 import 'package:path/path.dart';
 import 'package:async/async.dart';
+import 'package:flutter_dropzone/flutter_dropzone.dart';
 
 void main() {
   runApp(const MyApp());
@@ -49,7 +50,9 @@ class _MyHomePageState extends State<MyHomePage> {
   final _mailController = TextEditingController();
   final _themeController = TextEditingController();
   final _textController = TextEditingController();
-  final List<XFile> _pickedImages = [];
+  final List<Map<String, dynamic>> _pickedImages = [];
+  late DropzoneViewController controllerDropImage;
+  bool highlighted = false;
 
   @override
   void dispose() {
@@ -69,75 +72,122 @@ class _MyHomePageState extends State<MyHomePage> {
         ),
         body: Form(
           key: _formKey,
-          child: ListView(
-            padding: const EdgeInsets.all(20),
-            shrinkWrap: true,
-            children: [
-              _buildInputText("ФИО", _fioController, TextInputType.text, 1),
-              _buildInputNumber(context),
-              _buildInputText(
-                  "почта", _mailController, TextInputType.emailAddress, 1),
-              _buildInputText(
-                  "тема задачи", _themeController, TextInputType.text, 2),
-              _buildInputText(
-                  "текст задачи", _textController, TextInputType.text, 3),
-              Container(
-                padding: const EdgeInsets.only(left: 10),
-                alignment: Alignment.centerLeft,
-                height: 60,
-                width: 180,
-                child: ElevatedButton(
-                  onPressed: _pickImage,
-                  child: const Text('Выбрать изображение'),
-                ),
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.all(20.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildInputText("ФИО", _fioController, TextInputType.text, 1),
+                  _buildInputNumber(context),
+                  _buildInputText(
+                      "почта", _mailController, TextInputType.emailAddress, 1),
+                  _buildInputText(
+                      "тема задачи", _themeController, TextInputType.text, 2),
+                  SizedBox(
+                    height: 120,
+                    width: MediaQuery.of(context).size.width,
+                    child: Stack(
+                      children: [
+                        _buildDropZone(context),
+                        _buildInputText("текст задачи и вложения",
+                            _textController, TextInputType.text, 3),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.only(left: 10),
+                    alignment: Alignment.centerLeft,
+                    height: 60,
+                    width: 200,
+                    child: ElevatedButton(
+                      onPressed: _pickImage,
+                      child: const Text('Выбрать вложение'),
+                    ),
+                  ),
+                  _pickedImages.isNotEmpty
+                      ? SizedBox(
+                          height: 200,
+                          child: ListView.separated(
+                              scrollDirection: Axis.horizontal,
+                              shrinkWrap: true,
+                              itemCount: _pickedImages.length,
+                              itemBuilder: (context, index) => Stack(children: [
+                                    Container(
+                                        alignment: Alignment.centerLeft,
+                                        child: Padding(
+                                            padding: const EdgeInsets.all(8.0),
+                                            child: Image.network(
+                                                _pickedImages[index]["path"]))),
+                                    IconButton(
+                                        onPressed: () {
+                                          setState(() {
+                                            _pickedImages.removeAt(index);
+                                          });
+                                        },
+                                        icon: const Icon(Icons.close))
+                                  ]),
+                              separatorBuilder: (context, index) =>
+                                  const Divider(color: Colors.transparent)),
+                        )
+                      : const SizedBox(),
+                  Container(
+                      padding: const EdgeInsets.only(left: 10),
+                      alignment: Alignment.centerLeft,
+                      height: 60,
+                      width: 480,
+                      child: ElevatedButton.icon(
+                        onPressed: () => saveForm(),
+                        icon: const Icon(Icons.done),
+                        label: const Text('Сохранить'),
+                      )),
+                ],
               ),
-              _pickedImages.isNotEmpty
-                  ? SizedBox(
-                      height: 200,
-                      child: ListView.separated(
-                          scrollDirection: Axis.horizontal,
-                          shrinkWrap: true,
-                          itemCount: _pickedImages.length,
-                          itemBuilder: (context, index) => Stack(children: [
-                                Container(
-                                    alignment: Alignment.centerLeft,
-                                    child: Padding(
-                                        padding: const EdgeInsets.all(8.0),
-                                        child: Image.network(
-                                            _pickedImages[index].path))),
-                                IconButton(
-                                    onPressed: () {
-                                      setState(() {
-                                        _pickedImages.removeAt(index);
-                                      });
-                                    },
-                                    icon: const Icon(Icons.close))
-                              ]),
-                          separatorBuilder: (context, index) =>
-                              const Divider(color: Colors.transparent)),
-                    )
-                  : const SizedBox(),
-              Container(
-                  padding: const EdgeInsets.only(left: 10),
-                  alignment: Alignment.centerLeft,
-                  height: 60,
-                  width: 480,
-                  child: ElevatedButton.icon(
-                    onPressed: () => saveForm(),
-                    icon: const Icon(Icons.done),
-                    label: const Text('Сохранить'),
-                  )),
-            ],
+            ),
           ),
         ));
   }
 
+  Widget _buildDropZone(BuildContext context) => Builder(
+        builder: (context) => DropzoneView(
+          operation: DragOperation.copy,
+          cursor: CursorType.Default,
+          onCreated: (ctrl) => controllerDropImage = ctrl,
+          onError: (ev) => print('Zone 1 error: $ev'),
+          onHover: () {
+            setState(() => highlighted = true);
+          },
+          onLeave: () {
+            setState(() => highlighted = false);
+          },
+          onDrop: (ev) async {
+            final bytes = await controllerDropImage.getFileData(ev);
+            final url = await controllerDropImage.createFileUrl(ev);
+            setState(() {
+              highlighted = false;
+              _pickedImages.add({"path": url, "bytes": bytes});
+            });
+          },
+          onDropMultiple: (ev) async {
+            // for (int i = 0; i < ev!.length; i++) {
+            //   final bytes = await controllerDropImage.getFileData(ev[i]);
+            //   final url = await controllerDropImage.createFileUrl(ev[i]);
+            //   setState(() {
+            //     _pickedImages.add({"path": url, "bytes": bytes});
+            //   });
+            // }
+          },
+        ),
+      );
+
   Future<void> _pickImage() async {
     final fromPicker = await ImagePicker().pickMultiImage();
     if (fromPicker != null) {
-      setState(() {
-        _pickedImages.addAll(fromPicker);
-      });
+      for (int i = 0; i < fromPicker.length; i++) {
+        Uint8List bytes = await fromPicker[i].readAsBytes();
+        _pickedImages.add({"path": fromPicker[i].path, "bytes": bytes});
+      }
+      setState(() {});
     }
   }
 
@@ -182,7 +232,7 @@ class _MyHomePageState extends State<MyHomePage> {
         toolbarOptions: const ToolbarOptions(
             copy: true, paste: true, cut: true, selectAll: true),
         minLines: minLines,
-        maxLines: 100,
+        maxLines: minLines,
         validator: (value) {
           if (value != null && value.isEmpty) {
             return "поле  не заполнено";
@@ -198,6 +248,9 @@ class _MyHomePageState extends State<MyHomePage> {
         controller: controller,
         style: const TextStyle(fontSize: 24),
         decoration: InputDecoration(
+          hoverColor: Colors.transparent,
+          filled: controller == _textController ? true : false,
+          fillColor: highlighted ? Colors.grey : Colors.transparent,
           border: OutlineInputBorder(
             borderSide: const BorderSide(width: 1, color: Colors.grey),
             borderRadius: BorderRadius.circular(15),
@@ -244,7 +297,7 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   httpPost(String fio, String phone, String email, String theme, String text,
-      List<XFile> filename) async {
+      filename) async {
     String url = "http://172.18.1.207/api/issues";
     var body = json.encode({
       "project": {"id": "0-72"},
@@ -265,7 +318,7 @@ class _MyHomePageState extends State<MyHomePage> {
         String id = body["id"];
         if (filename.isNotEmpty) {
           for (int i = 0; i < filename.length; i++) {
-            uploadImage(filename[i].path, await filename[i].readAsBytes(), id);
+            uploadImage(filename[i]["path"], filename[i]["bytes"], id);
           }
         }
       }
@@ -279,3 +332,5 @@ class _MyHomePageState extends State<MyHomePage> {
     }
   }
 }
+
+class Unit8List {}
