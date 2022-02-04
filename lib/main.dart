@@ -67,6 +67,7 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+        backgroundColor: highlighted ? Colors.grey : Colors.transparent,
         appBar: AppBar(
           title: Text(widget.title),
         ),
@@ -75,72 +76,75 @@ class _MyHomePageState extends State<MyHomePage> {
           child: SingleChildScrollView(
             child: Padding(
               padding: const EdgeInsets.all(20.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Stack(
                 children: [
-                  _buildInputText("ФИО", _fioController, TextInputType.text, 1),
-                  _buildInputNumber(context),
-                  _buildInputText(
-                      "почта", _mailController, TextInputType.emailAddress, 1),
-                  _buildInputText(
-                      "тема задачи", _themeController, TextInputType.text, 2),
                   SizedBox(
-                    height: 120,
-                    width: MediaQuery.of(context).size.width,
-                    child: Stack(
-                      children: [
-                        _buildDropZone(context),
-                        _buildInputText("текст задачи и вложения",
-                            _textController, TextInputType.text, 3),
-                      ],
-                    ),
+                      height: MediaQuery.of(context).size.height,
+                      width: MediaQuery.of(context).size.width,
+                      child: _buildDropZone(context)),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildInputText(
+                          "ФИО", _fioController, TextInputType.text, 1),
+                      _buildInputNumber(context),
+                      _buildInputText("почта", _mailController,
+                          TextInputType.emailAddress, 1),
+                      _buildInputText("тема задачи", _themeController,
+                          TextInputType.text, 2),
+                      _buildInputText("текст задачи и вложения",
+                          _textController, TextInputType.text, 3),
+                      Container(
+                        padding: const EdgeInsets.only(left: 10),
+                        alignment: Alignment.centerLeft,
+                        height: 60,
+                        width: 200,
+                        child: ElevatedButton(
+                          onPressed: _pickImage,
+                          child: const Text('Выбрать вложение'),
+                        ),
+                      ),
+                      _pickedImages.isNotEmpty
+                          ? SizedBox(
+                              height: 200,
+                              child: ListView.separated(
+                                  scrollDirection: Axis.horizontal,
+                                  shrinkWrap: true,
+                                  itemCount: _pickedImages.length,
+                                  itemBuilder: (context, index) =>
+                                      Stack(children: [
+                                        Container(
+                                            alignment: Alignment.centerLeft,
+                                            child: Padding(
+                                                padding:
+                                                    const EdgeInsets.all(8.0),
+                                                child: Image.network(
+                                                    _pickedImages[index]
+                                                        ["path"]))),
+                                        IconButton(
+                                            onPressed: () {
+                                              setState(() {
+                                                _pickedImages.removeAt(index);
+                                              });
+                                            },
+                                            icon: const Icon(Icons.close))
+                                      ]),
+                                  separatorBuilder: (context, index) =>
+                                      const Divider(color: Colors.transparent)),
+                            )
+                          : const SizedBox(),
+                      Container(
+                          padding: const EdgeInsets.only(left: 10),
+                          alignment: Alignment.centerLeft,
+                          height: 60,
+                          width: 480,
+                          child: ElevatedButton.icon(
+                            onPressed: () => saveForm(),
+                            icon: const Icon(Icons.done),
+                            label: const Text('Сохранить'),
+                          )),
+                    ],
                   ),
-                  Container(
-                    padding: const EdgeInsets.only(left: 10),
-                    alignment: Alignment.centerLeft,
-                    height: 60,
-                    width: 200,
-                    child: ElevatedButton(
-                      onPressed: _pickImage,
-                      child: const Text('Выбрать вложение'),
-                    ),
-                  ),
-                  _pickedImages.isNotEmpty
-                      ? SizedBox(
-                          height: 200,
-                          child: ListView.separated(
-                              scrollDirection: Axis.horizontal,
-                              shrinkWrap: true,
-                              itemCount: _pickedImages.length,
-                              itemBuilder: (context, index) => Stack(children: [
-                                    Container(
-                                        alignment: Alignment.centerLeft,
-                                        child: Padding(
-                                            padding: const EdgeInsets.all(8.0),
-                                            child: Image.network(
-                                                _pickedImages[index]["path"]))),
-                                    IconButton(
-                                        onPressed: () {
-                                          setState(() {
-                                            _pickedImages.removeAt(index);
-                                          });
-                                        },
-                                        icon: const Icon(Icons.close))
-                                  ]),
-                              separatorBuilder: (context, index) =>
-                                  const Divider(color: Colors.transparent)),
-                        )
-                      : const SizedBox(),
-                  Container(
-                      padding: const EdgeInsets.only(left: 10),
-                      alignment: Alignment.centerLeft,
-                      height: 60,
-                      width: 480,
-                      child: ElevatedButton.icon(
-                        onPressed: () => saveForm(),
-                        icon: const Icon(Icons.done),
-                        label: const Text('Сохранить'),
-                      )),
                 ],
               ),
             ),
@@ -168,15 +172,7 @@ class _MyHomePageState extends State<MyHomePage> {
               _pickedImages.add({"path": url, "bytes": bytes});
             });
           },
-          onDropMultiple: (ev) async {
-            // for (int i = 0; i < ev!.length; i++) {
-            //   final bytes = await controllerDropImage.getFileData(ev[i]);
-            //   final url = await controllerDropImage.createFileUrl(ev[i]);
-            //   setState(() {
-            //     _pickedImages.add({"path": url, "bytes": bytes});
-            //   });
-            // }
-          },
+          onDropMultiple: (ev) async {},
         ),
       );
 
